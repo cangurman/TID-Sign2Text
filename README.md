@@ -73,11 +73,17 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
       (3/8). 60 örnek/8-15 kare dengeli sürüm → 4/8. Ders: tek işaretçili küçük
       veride emisyon ayarıyla çözüm tükendi; kalıcı çözüm çok işaretçili veri +
       (sonraki aşama) CTC tarzı sınır öğrenimi.
-- [~] **Çok işaretçili eğitim (sürüyor)**: 10 yeni shard indirildi → eğitim
-      havuzu 16 işaretçi / 1790 video (64 sınıf, sınıf başına ~28). signer10
-      eğitimden tamamen dışlandı, dokunulmamış test seti. Landmark çıkarımı
-      arka planda; ardından yeniden eğitim + signer10'da dürüst genelleme ölçümü
-      (tek işaretçili modelin taban çizgisi: %7.9-9.5).
+- [x] **Çok işaretçili eğitim + A/B ablasyonu (11 Eyl 2026)**: 16 işaretçi /
+      1790 video, 64 sınıf; signer10 eğitimden tamamen dışlanıp test seti yapıldı.
+      | Model | Aynı-işaretçi val | signer10 (görülmemiş) | Top-3 |
+      |---|---|---|---|
+      | Tek işaretçili (eski) | ~%99 | %7.9 | %11 |
+      | A: salt eklem 258 | %87.9 | %69.8 | %90.5 |
+      | **B: +kemik+hareket 660 (aktif)** | **%93.5** | **%79.4** | **%95.2** |
+      İki ölçülmüş bulgu: işaretçi çeşitliliği %7.9→%69.8; bone+motion akışları
+      (SAM-SLR reçetesi) +9.6 puan. Sonraki basamak: kalan işaretçiler (issue #2).
+      Ek test havuzu hazır: aynanın val bölmesi indirildi (6 yeni görülmemiş
+      işaretçi: 1,11,16,18,25,35).
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
       yüzle kodlanır; "var/yok" ayrımı için gerekli (bkz. Ürün Vizyonu)
 - [ ] Kendi webcam verisi (`idle` dahil) + kişiselleştirme
