@@ -1,0 +1,18 @@
+# Virtual environment
+backend/venv/
+
+# All data: AUTSL videos and everything derived from them (landmarks, stitched
+# sentence videos, eval reports). AUTSL is research-only licensed and must not
+# be redistributed - see README "Veri Edinme".
+backend/data/
+
+# Trained weights (derived from AUTSL data - not redistributed)
+backend/models/checkpoints/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db

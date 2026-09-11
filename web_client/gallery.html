@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>TID-Sign2Text — Video Demo Galerisi</title>
+<style>
+  :root { --bg:#0f1117; --card:#1a1d27; --ok:#4ade80; --err:#f87171; --muted:#8b90a0; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:#e8eaf0; padding:20px; }
+  h1 { font-size:1.3rem; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:0.9rem; margin-bottom:16px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .stat { background:var(--card); border-radius:10px; padding:10px 18px; }
+  .stat b { display:block; font-size:1.4rem; }
+  .stat span { color:var(--muted); font-size:0.78rem; }
+  .filters { margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap; }
+  .filters button { background:var(--card); color:#e8eaf0; border:1px solid #2b2f3d;
+                    border-radius:8px; padding:6px 14px; cursor:pointer; font-size:0.85rem; }
+  .filters button.active { background:#2563eb; border-color:#2563eb; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+  .card { background:var(--card); border-radius:12px; overflow:hidden; border:1px solid #2b2f3d; }
+  .vidwrap { position:relative; }
+  .card video { width:100%; aspect-ratio:1/1; object-fit:cover; background:#000; display:block; }
+  .livesub { position:absolute; left:0; right:0; bottom:0; padding:22px 8px 6px; text-align:center;
+             background:linear-gradient(transparent, rgba(0,0,0,0.85)); pointer-events:none;
+             font-weight:800; font-size:1.05rem; color:#4ade80;
+             text-shadow:0 1px 6px rgba(0,0,0,0.9); min-height:1.5em; }
+  .livesub.pending { color:#fbbf24; font-weight:500; font-size:0.85rem; }
+  .card .body { padding:10px 12px; }
+  .row { display:flex; justify-content:space-between; align-items:baseline; gap:6px; }
+  .true { font-weight:700; font-size:1.02rem; }
+  .pred { font-size:0.9rem; }
+  .pred.ok { color:var(--ok); } .pred.err { color:var(--err); }
+  .badge { font-size:0.68rem; padding:2px 8px; border-radius:99px; background:#2b2f3d; color:var(--muted); }
+  .badge.val { background:#3b2f6b; color:#c4b5fd; }
+  .top3 { color:var(--muted); font-size:0.72rem; margin-top:6px; }
+  .conf-bar { height:4px; background:#2b2f3d; border-radius:2px; margin-top:8px; overflow:hidden; }
+  .conf-bar i { display:block; height:100%; }
+</style>
+</head>
+<body>
+<h1>TID-Sign2Text — İndirilen Videolarda Sign-to-Text</h1>
+<div class="sub">AUTSL (Ankara Ünv. TİD veri seti) videoları · MediaPipe landmark → Bi-LSTM ·
+her kart: gerçek etiket, modelin çevirisi ve güveni. <b>Doğrulama</b> rozetli videolar eğitimde hiç görülmedi.</div>
+<div class="stats" id="stats"></div>
+<div class="filters" id="filters">
+  <button data-f="best" class="active">Kelime başına 1 video</button>
+  <button data-f="all">Tüm videolar</button>
+  <button data-f="val">Sadece doğrulama</button>
+  <button data-f="err">Sadece hatalar</button>
+</div>
+<div class="grid" id="grid"></div>
+
+<script>
+let DATA = null, FILTER = "best";
+function bestPerClass(rows) {
+  const rank = r => (r.split === "val" ? 0 : 100) + (r.correct ? 0 : 10) + (1 - r.conf);
+  const byClass = {};
+  for (const r of rows) {
+    const cur = byClass[r.true];
+    if (!cur || rank(r) < rank(cur)) byClass[r.true] = r;
+  }
+  return Object.keys(byClass).sort().map(k => byClass[k]);
+}
+function render() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+  let rows = DATA.results.filter(r => r.video);
+  if (FILTER === "best") rows = bestPerClass(rows);
+  if (FILTER === "val") rows = rows.filter(r => r.split === "val");
+  if (FILTER === "err") rows = rows.filter(r => !r.correct);
+  for (const r of rows) {
+    const ok = r.correct;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="vidwrap">
+        <video src="/videos/${r.video}?v=h264" preload="metadata" controls muted loop playsinline></video>
+        <div class="livesub"></div>
+      </div>
+      <div class="body">
+        <div class="row">
+          <span class="true">${r.true.replace(/_/g," ")}</span>
+          <span class="badge ${r.split}">${r.split === "val" ? "doğrulama" : "eğitim"}</span>
+        </div>
+        <div class="pred ${ok ? "ok" : "err"}">${ok ? "✓" : "✗"} model: ${r.pred.replace(/_/g," ")} (${(r.conf*100).toFixed(0)}%)</div>
+        <div class="conf-bar"><i style="width:${r.conf*100}%;background:${ok ? "var(--ok)" : "var(--err)"}"></i></div>
+        <div class="top3">${r.top3.map(t => `${t[0]} ${(t[1]*100).toFixed(0)}%`).join(" · ")}</div>
+      </div>`;
+    const vid = card.querySelector("video");
+    const sub = card.querySelector(".livesub");
+    vid.addEventListener("timeupdate", () => {
+      let last = null;
+      for (const e of (r.events || [])) { if (e.t <= vid.currentTime) last = e; else break; }
+      if (!last) { sub.className = "livesub pending"; sub.textContent = vid.paused ? "" : "· · ·"; return; }
+      if (last.stable && !last.label.startsWith("_")) {
+        sub.className = "livesub";
+        sub.textContent = last.label.replace(/_/g, " ").toUpperCase();
+      } else {
+        sub.className = "livesub pending";
+        sub.textContent = last.label.startsWith("_") ? "· · ·" : last.label.replace(/_/g, " ") + "…";
+      }
+    });
+    grid.appendChild(card);
+  }
+}
+fetch("/api/results").then(r => r.json()).then(d => {
+  DATA = d;
+  const s = d.summary;
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><b>${s.num_classes}</b><span>sınıf (işaret)</span></div>
+    <div class="stat"><b>${s.num_videos}</b><span>video</span></div>
+    <div class="stat"><b>${(s.val_acc*100).toFixed(0)}%</b><span>doğrulama doğruluğu (n=${s.val_count})</span></div>
+    <div class="stat"><b>${(s.train_acc*100).toFixed(0)}%</b><span>eğitim doğruluğu</span></div>`;
+  render();
+});
+document.getElementById("filters").addEventListener("click", e => {
+  if (!e.target.dataset.f) return;
+  FILTER = e.target.dataset.f;
+  document.querySelectorAll(".filters button").forEach(b => b.classList.toggle("active", b === e.target));
+  render();
+});
+</script>
+</body>
+</html>

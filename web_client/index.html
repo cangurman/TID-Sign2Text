@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>TID-Sign2Text Web Demo</title>
+<style>
+  body { margin:0; font-family:system-ui,sans-serif; background:#111; color:#eee;
+         display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1 { font-size:1.2rem; margin:4px 0; }
+  #stage { position:relative; }
+  video, canvas { width:640px; max-width:95vw; border-radius:8px; }
+  video { display:none; }
+  #subtitle { min-height:2.4em; font-size:1.6rem; font-weight:700; color:#4ade80; text-align:center; }
+  #status { font-size:0.85rem; color:#999; }
+  button { padding:8px 16px; border:0; border-radius:6px; background:#2563eb; color:#fff; cursor:pointer; }
+</style>
+</head>
+<body>
+<h1>TID-Sign2Text — Web Demo</h1>
+<div id="stage">
+  <video id="video" playsinline></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+</div>
+<div id="subtitle">…</div>
+<div id="status">başlatılıyor…</div>
+<button id="resetBtn">Pencereyi sıfırla</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+const POSE_N = 33, HAND_N = 21, FRAME_DIM = 33*4 + 21*3*2; // 258 — must match backend features.py
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const subtitleEl = document.getElementById("subtitle");
+const statusEl = document.getElementById("status");
+
+let ws = null;
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws/stream`);
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.error) { statusEl.textContent = "Sunucu: " + msg.error; return; }
+    if (msg.stable) subtitleEl.textContent = msg.text;
+    statusEl.textContent = `tahmin: ${msg.text} (güven ${(msg.confidence*100).toFixed(0)}%)`;
+  };
+  ws.onclose = () => { statusEl.textContent = "bağlantı koptu, yeniden deneniyor…"; setTimeout(connectWS, 2000); };
+}
+connectWS();
+document.getElementById("resetBtn").onclick = () => {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({cmd: "reset"}));
+  subtitleEl.textContent = "…";
+};
+
+// Build the exact 258-float vector used by backend/preprocessing/features.py
+function frameVector(res) {
+  const v = new Array(FRAME_DIM).fill(0);
+  let o = 0;
+  if (res.poseLandmarks) {
+    for (const lm of res.poseLandmarks) { v[o++]=lm.x; v[o++]=lm.y; v[o++]=lm.z; v[o++]=lm.visibility ?? 0; }
+  } else o += POSE_N*4;
+  if (res.leftHandLandmarks) {
+    for (const lm of res.leftHandLandmarks) { v[o++]=lm.x; v[o++]=lm.y; v[o++]=lm.z; }
+  } else o += HAND_N*3;
+  if (res.rightHandLandmarks) {
+    for (const lm of res.rightHandLandmarks) { v[o++]=lm.x; v[o++]=lm.y; v[o++]=lm.z; }
+  }
+  return v;
+}
+
+const holistic = new Holistic({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${f}`});
+holistic.setOptions({modelComplexity: 1, smoothLandmarks: true,
+                     minDetectionConfidence: 0.5, minTrackingConfidence: 0.5});
+holistic.onResults((res) => {
+  ctx.save();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+  if (res.poseLandmarks) drawConnectors(ctx, res.poseLandmarks, POSE_CONNECTIONS, {color:"#555", lineWidth:2});
+  for (const h of [res.leftHandLandmarks, res.rightHandLandmarks])
+    if (h) { drawConnectors(ctx, h, HAND_CONNECTIONS, {color:"#4ade80", lineWidth:2});
+             drawLandmarks(ctx, h, {color:"#fff", radius:2}); }
+  ctx.restore();
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({frame: frameVector(res)}));
+});
+
+new Camera(video, {
+  onFrame: async () => { await holistic.send({image: video}); },
+  width: 640, height: 480,
+}).start();
+statusEl.textContent = "kamera açık — işaret yapmaya başlayın";
+</script>
+</body>
+</html>

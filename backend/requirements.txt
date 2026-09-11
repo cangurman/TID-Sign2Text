@@ -1,0 +1,13 @@
+# TID-Sign2Text backend dependencies
+# Python 3.12 (mediapipe does not yet support 3.13/3.14 on Windows)
+numpy<2.0
+opencv-python>=4.9
+# mediapipe 1.0.x removed the legacy mp.solutions API our pipeline uses (verified 2026-09-11)
+mediapipe==0.10.21
+torch>=2.2
+fastapi>=0.110
+uvicorn[standard]>=0.29
+websockets>=12.0
+scikit-learn>=1.4
+tqdm>=4.66
+matplotlib>=3.8
