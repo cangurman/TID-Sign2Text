@@ -109,6 +109,25 @@ için indirilebilir.
   → segmentle + izole sınıflandırıcıyı segment başına çalıştır. CTC'den basit
   ama sınır hatası zincirleme hata üretir; yedek plan olarak not edildi.
 
+## 4c. Veri kaynağı taraması (11 Eylül 2026, 3. tur)
+- **En değerli bulgu:** HuggingFace AUTSL aynasının `val/` (9 shard, ~3.2 GB;
+  işaretçiler 1,11,16,18,25,35) ve `test/` bölmeleri (işaretçiler
+  6,14,27,30,34,39) etiket CSV'leriyle birlikte duruyor — eğitimdekilerle
+  çakışmayan **12 görülmemiş işaretçi**, ~8.160 klip. Çok-işaretçili dürüst
+  test için hazır. (Ayna lisansı gri — dahili araştırma + makale atfı.)
+- YouTube: resmi "Türk İşaret Dili Sözlüğü" kanalı kelime-klip formatında
+  (ML'e uygun yapı) ama **YouTube TOS indirmeyi yasaklıyor** — referans olarak
+  kullanılabilir, eğitim verisi olarak indirilemez. Google'ın YouTube-SL-25
+  derlemi (arxiv 2407.11144) TİD dahil video ID listesi yayınlıyor — sürekli
+  işaretleme fazı için not edildi.
+- Hastane alanı: açık indirilebilir TİD hastane videosu YOK. Tek gerçek yol
+  HospiSign/BosphorusSign-Health için yazarlara EULA e-postası (issue #4).
+  tidsozluk.aile.gov.tr lisans sayfası yok → izin istenmeden veri olarak
+  kullanılmaz; sözlük/referans olarak kullanılır.
+- Kaggle'da TİD kelime videosu yok (yalnız statik parmak alfabesi);
+  Spoken2TSL (HF) yalnız metin-gloss çifti — Türkçe cümle katmanı (gramer)
+  için faydalı olabilir.
+
 ## 5. Dürüst değerlendirme notu
 AUTSL'de rastgele bölme %95.9'a karşı işaretçiden bağımsız bölme %62 (baseline) —
 aradaki uçurum, aynı kişinin örnekleriyle test etmenin ne kadar yanıltıcı
