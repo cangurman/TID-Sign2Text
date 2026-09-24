@@ -153,6 +153,20 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
          0.78. Eşik 0.7: örneklerin %67'si kabul, kabul edilenlerde doğruluk %92.3;
          0.8: %55 kabul, %95.0; 0.9: %16 kabul, %98.3. (Kalibrasyon ayrıca doğrulanmadı.)
       Hatalar birkaç sınıfa toplanmıyor: en kötü 10 sınıf hataların %36'sını taşıyor.
+- [x] **Hub düzeltme denemesi: sınıf başına logit ayarı — ETKİSİZ (24 Eyl 2026)**:
+      `pipeline/logit_adjust_cv.py`. Her fold'da eğitim işaretçilerinden 2'si kalibrasyona
+      ayrıldı, model kalanlarla eğitildi, sınıf başına bias kalibrasyon işaretçilerinin
+      logit'lerinden öğrenildi (test işaretçileri hiç kullanılmadı; `_gecis` bias'ı 0'da
+      sabit; birincil λ=0.1 sonuçlardan önce belirlendi). Aynı model, bias'sız vs bias'lı
+      (8 koşu, 2565×2 tahmin): doğruluk **%73.5 → %73.4 (-0.08 puan, işaretçi düzeyinde
+      %95 GA [-0.50, +0.30])**; λ=0.01: -0.10, λ=1.0: +0.10. 13 işaretçiden 4'ü iyileşti,
+      7'si kötüleşti. Hub'lar biraz azaldı (`ayni` 2.12→1.91 tahmin/gerçek, sınıflar arası
+      std 0.226→0.201) ama doğruluğa dönüşmedi; güvenle reddetme eğrisi de değişmedi
+      (eşik 0.8: %93.5 → %93.4). Sonuç: hub eğilimi sınıf-sabit toplamsal bir sapma gibi
+      görünmüyor; girdiye (işaretçiye) bağlı olması bir *tahmin*, doğrulanmadı.
+      Benimsenmedi. Ek gözlem: bu modeller 7-8 işaretçiyle eğitildi ve tabanları %73.5;
+      9-10 işaretçili CV'de %78.5 idi (aynı fold/epoch; kalibrasyon işaretçileri seed'e
+      göre değişiyor, o yüzden karışık): işaretçi sayısı hâlâ en güçlü kaldıraç.
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
       yüzle kodlanır; "var/yok" ayrımı için gerekli (bkz. Ürün Vizyonu)
 - [ ] Kendi webcam verisi (`idle` dahil) + kişiselleştirme

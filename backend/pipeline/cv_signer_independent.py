@@ -55,26 +55,16 @@ def assign_folds(signers: list[str], k: int) -> dict[str, int]:
     return {s: i % k for i, s in enumerate(ordered)}
 
 
-def run_fold(args: argparse.Namespace, fold: int, seed: int, items, classes, fold_of) -> None:
+def train_model(train_refs: list[SampleRef], num_classes: int, args: argparse.Namespace, seed: int, tag: str):
+    """Train exactly like train.py (final-epoch weights, no checkpoint selection)."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.set_num_threads(4)
-    labels = classes + [TRANSITION_LABEL]
-    cls_idx = {c: i for i, c in enumerate(labels)}
-    train_refs = [SampleRef(p, cls_idx[c]) for p, c, s in items if fold_of[s] != fold]
-    test = [(SampleRef(p, cls_idx[c]), s) for p, c, s in items if fold_of[s] == fold]
-
-    trans_dir = CV_DIR / f"tmp_fold{fold}" / TRANSITION_LABEL
-    if trans_dir.parent.exists():
-        shutil.rmtree(trans_dir.parent)
-    stitch_transitions(train_refs, trans_dir, TRANSITIONS, seed=7)
-    train_refs += [SampleRef(f, cls_idx[TRANSITION_LABEL]) for f in sorted(trans_dir.glob("*.npy"))]
-
     torch.manual_seed(seed)
     np.random.seed(seed)
     train_loader = DataLoader(
         LandmarkDataset(train_refs, seq_len=60, augment=True, streams=args.streams),
         batch_size=32, shuffle=True, num_workers=0)
-    model = build_model(args.model, num_classes=len(labels),
+    model = build_model(args.model, num_classes=num_classes,
                         input_dim=STREAMS_DIM if args.streams else FRAME_DIM).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -89,9 +79,34 @@ def run_fold(args: argparse.Namespace, fold: int, seed: int, items, classes, fol
             optimizer.step()
         scheduler.step()
         if epoch % 10 == 0:
-            print(f"[fold {fold} seed {seed}] epoch {epoch}/{args.epochs}", flush=True)
-
+            print(f"[{tag}] epoch {epoch}/{args.epochs}", flush=True)
     model.eval()
+    return model, device
+
+
+def predict_logits(model, device, refs: list[SampleRef], streams: bool) -> np.ndarray:
+    ds = LandmarkDataset(refs, seq_len=60, augment=False, streams=streams)
+    out = []
+    with torch.no_grad():
+        for i in range(len(refs)):
+            x, _ = ds[i]
+            out.append(model(x.unsqueeze(0).to(device))[0].cpu().numpy())
+    return np.stack(out)
+
+
+def run_fold(args: argparse.Namespace, fold: int, seed: int, items, classes, fold_of) -> None:
+    labels = classes + [TRANSITION_LABEL]
+    cls_idx = {c: i for i, c in enumerate(labels)}
+    train_refs = [SampleRef(p, cls_idx[c]) for p, c, s in items if fold_of[s] != fold]
+    test = [(SampleRef(p, cls_idx[c]), s) for p, c, s in items if fold_of[s] == fold]
+
+    trans_dir = CV_DIR / f"tmp_fold{fold}" / TRANSITION_LABEL
+    if trans_dir.parent.exists():
+        shutil.rmtree(trans_dir.parent)
+    stitch_transitions(train_refs, trans_dir, TRANSITIONS, seed=7)
+    train_refs += [SampleRef(f, cls_idx[TRANSITION_LABEL]) for f in sorted(trans_dir.glob("*.npy"))]
+
+    model, device = train_model(train_refs, len(labels), args, seed, f"fold {fold} seed {seed}")
     test_ds = LandmarkDataset([r for r, _ in test], seq_len=60, augment=False, streams=args.streams)
     records = []
     with torch.no_grad():
