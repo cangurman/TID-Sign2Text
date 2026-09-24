@@ -124,8 +124,35 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
       modelleri 9-10 işaretçiyle eğitildiğinden 12 işaretçili aktif modelin gerçek
       performansı bundan biraz yüksek olabilir (ölçülmedi). En zayıf sınıflar:
       `akilli`↔`carsamba`, `ezberlemek`→`ayni`, `aglamak`→`bakmak`, `tatli`↔`kiz`,
-      `kotu`→`onlar`, `biz`→`hayir` (sınıf recall'u %34-60). signer16'nın neden düşük
-      (%54.7) olduğu araştırılmadı (128 örnek; kamera/poz farkı tahmini doğrulanmadı).
+      `kotu`→`onlar`, `biz`→`hayir` (sınıf recall'u %34-60).
+- [x] **Hata kök neden analizi (24 Eyl 2026)**: `pipeline/analyze_errors.py`, çapraz
+      doğrulama tahminlerinden (2565 örnek × 2 seed). Ölçümler:
+      1. **Yakın sınıf çiftleri**: en sık 15 karışıklığın 9'u, ortalama landmark
+         uzayında tüm sınıf çiftlerinin en yakın %6'sında (`aglamak→bakmak` %0,
+         `tatli↔kiz` %0, `dakika→saat` %0, `dede→dolu` %0, `akilli→ezberlemek` %1,
+         `polis→cumartesi` %2). Üç çiftin (tatli/kiz, aglamak/bakmak, dakika/saat) 5'er
+         karesine baktım: ayırt edici ipucunu gözle seçemedim. Ayırt edici bilginin
+         (parmak şekli, yüz/ağız vb.) 258 boyutlu özellikte eksik olması bir *tahmin*,
+         doğrulanmadı.
+      2. **"Hub" sınıflar**: `ayni` 162 kez tahmin edildi, 80 kez gerçekte var (precision
+         %44); `onlar`, `pantolon`, `ogretmen` benzer. Karışıklıklar tek yönlü ve
+         landmark mesafeleri özellikle yakın değil (%13-39 yüzdelik), yani benzerlikle
+         açıklanmıyor. Bu 7 sınıfa (`ayni`, `onlar`, `pantolon`, `ogretmen`, `hep`,
+         `catal`, `hayir`) düşen yanlış tahmin ~296 / 1102 (%27; bir kısmı gerçek yakın
+         çiftler), beklenenin üstündeki fazla tahmin ise en az 234 (%21). Nedeni
+         doğrulanmadı (tahmin: görülmemiş işaretçi girdisi birkaç "genel" sınıfa kayıyor).
+      3. **El algılama hatası küçük payda**: örneklerin %4'ünde (107) el karelerin
+         <%80'inde algılanmış, bunlarda doğruluk %64 (diğerleri %77-86). Tahmini katkı
+         ~16/551 hata (%3, seed başına). signer16 için bu **çürütüldü**: düşük el algılamalı örnekleri %56.4,
+         yüksek olanlar %52.0. Bu işaretçi tek örnek sınıf (ben) için baktığım karelerde
+         ayakta ve kameradan uzak görünüyor (signer0 ve signer11 oturuyor, kadraj
+         yakın); bunun nedeni olduğu doğrulanmadı.
+      4. İşaretçi düzeyinde kare sayısı ile doğruluk arasında ρ=-0.62 (p=0.03, n=13),
+         örnek düzeyinde ilişki yok (ρ=-0.02); 4 ilişki denendiği için zayıf kanıt.
+      5. **Güvenle reddetme işe yarıyor**: yanlışların ortalama güveni 0.50, doğruların
+         0.78. Eşik 0.7: örneklerin %67'si kabul, kabul edilenlerde doğruluk %92.3;
+         0.8: %55 kabul, %95.0; 0.9: %16 kabul, %98.3. (Kalibrasyon ayrıca doğrulanmadı.)
+      Hatalar birkaç sınıfa toplanmıyor: en kötü 10 sınıf hataların %36'sını taşıyor.
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
       yüzle kodlanır; "var/yok" ayrımı için gerekli (bkz. Ürün Vizyonu)
 - [ ] Kendi webcam verisi (`idle` dahil) + kişiselleştirme
