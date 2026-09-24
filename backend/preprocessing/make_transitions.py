@@ -27,6 +27,27 @@ sys.path.insert(0, str(BACKEND / "pipeline"))
 TRANSITION_LABEL = "_gecis"
 
 
+def stitch_transitions(refs, out_dir: Path, count: int, seed: int = 7, segment: int | None = None) -> int:
+    """Write `count` boundary-stitched transition clips built from `refs` into out_dir."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(seed)
+    made = 0
+    while made < count:
+        a, b = rng.choice(len(refs), size=2, replace=False)
+        ra, rb = refs[a], refs[b]
+        if ra.label_idx == rb.label_idx:
+            continue
+        sa = np.load(ra.path).astype(np.float32)
+        sb = np.load(rb.path).astype(np.float32)
+        seg_a = segment or int(rng.integers(8, 16))
+        seg_b = segment or int(rng.integers(8, 16))
+        if sa.shape[0] < seg_a or sb.shape[0] < seg_b:
+            continue
+        np.save(out_dir / f"trans_{made:04d}.npy", np.concatenate([sa[-seg_a:], sb[:seg_b]], axis=0))
+        made += 1
+    return made
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--count", type=int, default=60,
@@ -50,22 +71,7 @@ def main() -> None:
     # Only stitch train-split clips: validation clips must stay unseen.
     train_refs, _ = stratified_split(samples, val_ratio=0.2, seed=42)
 
-    rng = np.random.default_rng(args.seed)
-    made = 0
-    while made < args.count:
-        a, b = rng.choice(len(train_refs), size=2, replace=False)
-        ra, rb = train_refs[a], train_refs[b]
-        if ra.label_idx == rb.label_idx:
-            continue
-        sa = np.load(ra.path).astype(np.float32)
-        sb = np.load(rb.path).astype(np.float32)
-        seg_a = args.segment or int(rng.integers(8, 16))
-        seg_b = args.segment or int(rng.integers(8, 16))
-        if sa.shape[0] < seg_a or sb.shape[0] < seg_b:
-            continue
-        seq = np.concatenate([sa[-seg_a:], sb[:seg_b]], axis=0)
-        np.save(out_dir / f"trans_{made:04d}.npy", seq)
-        made += 1
+    made = stitch_transitions(train_refs, out_dir, args.count, args.seed, args.segment)
     print(f"{made} transition samples -> {out_dir}")
 
 

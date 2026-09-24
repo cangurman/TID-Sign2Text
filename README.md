@@ -106,7 +106,26 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
       (`pamuk`, `saat`); sıfırlanmadı. Yedekler: `best_6signers.pt`,
       `best_12signers_oldsplit.pt`. Not: 6 işaretçili satır da eski bölmeyle eğitildi.
       Bu koşuda sınıf listesi en sık örneklenen 64 sınıftır (7 işaretçide ortak 198
-      sınıftan); önceki 64 sınıfla birebir aynı olduğu doğrulanamadı.
+      sınıftan, liste: `docs/CLASSES.md`); önceki 64 sınıfla birebir aynı olduğu
+      doğrulanamadı.
+- [x] **İşaretçi-gruplu çapraz doğrulama (24 Eyl 2026)**: `pipeline/cv_signer_independent.py`.
+      13 işaretçi 4 gruba bölündü (4/3/3/3); her grup sırayla test edildi, model kalan
+      9-10 işaretçiyle eğitildi (`_gecis` de yalnız onların kliplerinden), 2 seed,
+      son epoch değerlendirildi (held-out veriyle checkpoint seçimi yok). 2565 örnek:
+      | Ölçüt | Sonuç |
+      |---|---|
+      | Toplam doğruluk (top-1 / top-3) | **%78.5 / %90.6** (seed 0: %78.5, seed 1: %78.6) |
+      | Seed'ler arası sapma | ~0 (toplam), fold başına ≤1.9 puan |
+      | İşaretçi bazında | ort. %78.3, std 9.3, aralık %54.7 (signer16) – %91.2 (signer0) |
+      | %95 güven aralığı (işaretçiler üzerinde bootstrap) | [%73.8, %83.0] |
+      | Gerçek işaretin `_gecis`'e düşmesi | 36 / 5130 (%0.7) |
+      Yorum: değişkenliğin ana kaynağı eğitim rastgeleliği değil **işaretçidir**. Yeni bir
+      kişide beklenti ~%78 (aralık ~%74-83), tek kişide %55-91 arası çıkabilir. Fold
+      modelleri 9-10 işaretçiyle eğitildiğinden 12 işaretçili aktif modelin gerçek
+      performansı bundan biraz yüksek olabilir (ölçülmedi). En zayıf sınıflar:
+      `akilli`↔`carsamba`, `ezberlemek`→`ayni`, `aglamak`→`bakmak`, `tatli`↔`kiz`,
+      `kotu`→`onlar`, `biz`→`hayir` (sınıf recall'u %34-60). signer16'nın neden düşük
+      (%54.7) olduğu araştırılmadı (128 örnek; kamera/poz farkı tahmini doğrulanmadı).
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
       yüzle kodlanır; "var/yok" ayrımı için gerekli (bkz. Ürün Vizyonu)
 - [ ] Kendi webcam verisi (`idle` dahil) + kişiselleştirme
@@ -118,9 +137,12 @@ MediaPipe Holistic video modunda takip durumu videolar arasında sızar: aynı
 `make_sentences.py` bu yüzden her videoya taze Holistic örneği açar.
 
 ### Dürüstlük notları (önemli)
-1. **Gerçek metrik signer35 sütunudur**, karışık val değil: karışık val bölmesi
-   örnek bazlıdır, aynı işaretçinin videoları hem eğitimde hem val'da bulunur.
-   Signer35 tek bir işaretçi (188 örnek): ±birkaç puan gürültü payı vardır.
+1. **Gerçek metrik görülmemiş-işaretçi sütunudur**, karışık val değil: karışık val
+   bölmesi örnek bazlıdır, aynı işaretçinin videoları hem eğitimde hem val'da bulunur.
+   Tek işaretçiyle (signer35, 188 örnek) ölçmek yanıltıcıdır: çapraz doğrulamada
+   işaretçiler %55-91 arasında değişti (std 9.3 puan); en güvenilir sayı çapraz
+   doğrulamanın %78.5'idir (aralık %74-83). signer35 orada %82.4 çıktı, yani ortalamanın
+   biraz üstünde bir işaretçi (ve aktif modelde 3 işaretçi daha fazla eğitim vardı).
    Eski tek işaretçili (signer0) %93.5, yalnız aynı kişide geçerliydi; görülmemiş
    işaretçide %7.9 çıkmıştı.
 2. **Val/test bölmelerinin işaretçileri artık eğitimde**; aynadan bağımsız yeni bir
@@ -141,8 +163,10 @@ MediaPipe Holistic video modunda takip durumu videolar arasında sızar: aynı
    sonra hesaplıyordu; ölçüm: "val" denen 467 örnekten 373'ü aslında eğitimdeydi.
    Artık `train.py` ile aynı split kullanılıyor (val %94.9, n=467, `_gecis` hariç;
    tablodaki %95.3 `train.py`'nin 507 örnekli, `_gecis` dahil val'ıdır).
-6. `signer1` örnek sayısı diğerlerinin ~2 katı (384; AUTSL val etiketlerinde iki kez
-   kayıtlı görünüyor); dengelenmedi, etkisi ayrıca ölçülmedi.
+6. `signer1` örnek sayısı diğerlerinin ~2 katı (384; AUTSL val etiketlerinde 1344 örnek,
+   diğer val işaretçilerinde ~650-670). Kopya değil (byte-identical dosya yalnızca 2
+   çift, aynı işaretçi ve sınıf içinde); dengelenmedi. Çapraz doğrulamada signer1
+   %69.4 çıktı (ortalamanın altında); fazla örneğinin eğitime etkisi ayrıca ölçülmedi.
 7. `idle` (işaret yok) sınıfı yok: AUTSL'de bu veri bulunmuyor, webcam kaydı gerekir.
 
 AUTSL not: `backend/data/autsl/shard_001/` içinde 474 kullanılmayan video daha
