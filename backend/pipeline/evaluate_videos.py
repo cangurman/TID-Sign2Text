@@ -39,13 +39,15 @@ def main() -> None:
         checkpoint=DEFAULT_CHECKPOINT, window=30, stride=3, vote_len=5, threshold=0.5
     )
     samples, labels = discover_samples(landmarks_dir)
+    if labels != predictor.labels:
+        print("[warn] label set on disk differs from checkpoint labels - retrain before evaluating!")
+    # Split over ALL samples (incl. _gecis) exactly like train.py: the split uses one
+    # RNG stream across classes, so dropping _gecis first yields a different split.
+    train_refs, val_refs = stratified_split(samples, val_ratio=0.2, seed=42)  # must match train.py defaults
+    val_paths = {s.path for s in val_refs}
     # Synthetic helper classes (e.g. _gecis) train the model but are excluded
     # from the reported metrics and the gallery.
     samples = [s for s in samples if not labels[s.label_idx].startswith("_")]
-    if labels != predictor.labels:
-        print("[warn] label set on disk differs from checkpoint labels - retrain before evaluating!")
-    train_refs, val_refs = stratified_split(samples, val_ratio=0.2, seed=42)  # must match train.py defaults
-    val_paths = {s.path for s in val_refs}
 
     results = []
     for s in samples:

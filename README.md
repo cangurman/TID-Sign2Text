@@ -42,8 +42,14 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
 
 ## Kurulum durumu
 
-- [x] Python 3.12 venv: `backend/venv` (sistemdeki 3.14 MediaPipe'la uyumsuz)
-- [x] Bağımlılıklar kurulu (`mediapipe==0.10.21` — 1.0.x eski API'yi kaldırdı)
+- [x] Python venv: `backend/venv` (sistemdeki 3.14 MediaPipe'la uyumsuz; 24 Eyl
+      kurulumu Python 3.11.9 ile yapıldı ve çalıştı)
+- [x] Bağımlılıklar kurulu (`mediapipe==0.10.21` — 1.0.x eski API'yi kaldırdı).
+      Sıfırdan kurulumda `pip install -r requirements.txt` bağımlılık çözücüsü
+      takıldı (24 Eyl); çalışan yol: `numpy==1.26.4`, `mediapipe==0.10.21 --no-deps`,
+      `protobuf==4.25.3`, `opencv-contrib-python==4.10.0.84`, torch cu124; jax/jaxlib
+      kurulmadı (`mp.solutions.holistic` onsuz çalışıyor, `pip check` uyarısı zararsız).
+      Her kurulumdan sonra numpy'yi tekrar 1.26.4'e sabitle.
 - [x] Uçtan uca hat sentetik veriyle test edildi (extract → train → stream predict → API)
 - [x] Gerçek TİD verisiyle kanıt: AUTSL shard 1 (HuggingFace `aipieces/AUTSL`, 500 video)
 - [x] **31 sınıf × 4-6 video (toplam 131)** ile eğitim — model karşılaştırması:
@@ -82,8 +88,23 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
       | **B: +kemik+hareket 660 (aktif)** | **%93.5** | **%79.4** | **%95.2** |
       İki ölçülmüş bulgu: işaretçi çeşitliliği %7.9→%69.8; bone+motion akışları
       (SAM-SLR reçetesi) +9.6 puan. Sonraki basamak: kalan işaretçiler (issue #2).
-      Ek test havuzu hazır: aynanın val bölmesi indirildi (6 yeni görülmemiş
-      işaretçi: 1,11,16,18,25,35).
+      (Bu tablo önceki oturumdan; o veri/checkpoint bu makinede yoktu, yeniden
+      üretilemedi. Aşağıdaki 24 Eyl koşusu bağımsız bir yeniden kuruluştur.)
+- [x] **Val + test işaretçileriyle yeniden kurulum (23-24 Eyl 2026)**: AUTSL aynasının
+      val (işaretçi 1,11,16,18,25,35) ve test (6,14,27,30,34,39) bölmeleri indirildi;
+      signer0 (train shard 1) ile birlikte 64 sınıf. **signer35 tamamen eğitim dışı
+      tutuldu** (test seti, 188 örnek); diğer 12 işaretçi eğitimde. Transformer +
+      bone/motion akışları (660), 65 sınıf (64 + `_gecis`), 80 epoch:
+      | Eğitim işaretçisi | Karışık val | signer35 (görülmemiş) | Top-3 |
+      |---|---|---|---|
+      | 6 (signer0,1,11,16,18,25) | %93.9 | %78.2 (147/188) | %89.9 |
+      | **12 (+6,14,27,30,34,39) — aktif** | **%96.6** | **%89.4 (168/188)** | **%97.9** |
+      Aynı held-out işaretçi ve aynı ölçüm betiği: 6→12 işaretçi signer35 doğruluğunu
+      +11.2 puan artırdı, hatalar 41→20, tamamen kaçırılan sınıf 9→3 (`dakika`→`saat`,
+      `isik`→`ezberlemek`, `odun`). Önceki modelde `_gecis` gerçek kelimeleri yuttu
+      (5 hata), şimdi 0. Yedek: `best_6signers.pt`.
+      Bu koşuda sınıf listesi en sık örneklenen 64 sınıftır (7 işaretçide ortak 198
+      sınıftan); önceki 64 sınıfla birebir aynı olduğu doğrulanamadı.
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
       yüzle kodlanır; "var/yok" ayrımı için gerekli (bkz. Ürün Vizyonu)
 - [ ] Kendi webcam verisi (`idle` dahil) + kişiselleştirme
@@ -95,15 +116,28 @@ MediaPipe Holistic video modunda takip durumu videolar arasında sızar: aynı
 `make_sentences.py` bu yüzden her videoya taze Holistic örneği açar.
 
 ### Dürüstlük notları (önemli)
-1. **Tüm veri tek işaretçiden** (signer0 — shard 1 sadece onu içeriyor). %93.5,
-   *aynı kişinin görülmemiş videoları* üzerindeki doğruluktur. Farklı kişide
-   doğruluk belirgin düşecektir (AUTSL literatürü: rastgele bölmede ~%96'ya
-   karşı işaretçiden bağımsız bölmede ~%62 baseline). Çözüm: diğer shard'lardan
-   farklı işaretçiler indirilip test edilmeli.
-2. Doğrulama kümesi sınıf başına 1 video (n=31) — Transformer ile Bi-LSTM
-   arasındaki fark tek video, istatistiksel olarak zayıf. İkisi de tutuluyor.
-3. Eğitim doğruluğu %100 = model bu ölçekte ezberliyor; genelleme iddiası
-   yalnızca val sütunundan okunmalı.
+1. **Gerçek metrik signer35 sütunudur**, karışık val değil: karışık val bölmesi
+   örnek bazlıdır, aynı işaretçinin videoları hem eğitimde hem val'da bulunur.
+   Signer35 tek bir işaretçi (188 örnek): ±birkaç puan gürültü payı vardır.
+   Eski tek işaretçili (signer0) %93.5, yalnız aynı kişide geçerliydi; görülmemiş
+   işaretçide %7.9 çıkmıştı.
+2. **Val/test bölmelerinin işaretçileri artık eğitimde**; aynadan bağımsız yeni bir
+   görülmemiş işaretçi havuzu kalmadı (signer35 dışında). Yeni ölçüm için diğer
+   train shard'larından işaretçi indirilmeli.
+3. Eğitim doğruluğu %100 = model bu ölçekte ezberliyor; genelleme iddiası yalnızca
+   görülmemiş-işaretçi sütunundan okunmalı.
+4. **Bilinen veri sızıntısı (`_gecis`)**: `make_transitions.py` "yalnız train
+   klipleri" der, ama split'i `_gecis` olmadan hesaplar; `train.py` ise dahil
+   ederek. Tek RNG akışı yüzünden iki bölme farklı çıkar, dolayısıyla `_gecis`
+   klipleri val örneklerinin yarım parçalarını içerebilir. Bu, karışık val'ı (%96.6)
+   biraz şişirebilir; signer35 etkilenmez (üretimden önce ayrıldı). Ölçülmedi,
+   düzeltilmedi (düzeltme + yeniden eğitim gerekir).
+5. **`evaluate_videos.py` split hatası (düzeltildi)**: split'i `_gecis`'i çıkardıktan
+   sonra hesaplıyordu; ölçüm: "val" denen 467 örnekten 373'ü aslında eğitimdeydi.
+   Artık `train.py` ile aynı split kullanılıyor (val %96.6, n=467, 16 hata).
+6. `signer1` örnek sayısı diğerlerinin ~2 katı (384; AUTSL val etiketlerinde iki kez
+   kayıtlı görünüyor); dengelenmedi, etkisi ayrıca ölçülmedi.
+7. `idle` (işaret yok) sınıfı yok: AUTSL'de bu veri bulunmuyor, webcam kaydı gerekir.
 
 AUTSL not: `backend/data/autsl/shard_001/` içinde 474 kullanılmayan video daha
 var (215 sınıf); `prepare_autsl.py --top N` ile daha fazla sınıf eklenebilir.

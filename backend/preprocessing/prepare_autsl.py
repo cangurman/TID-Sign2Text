@@ -31,11 +31,13 @@ def main() -> None:
                         help="only stage videos of this signer, e.g. signer0")
     parser.add_argument("--exclude-signer", type=str, default=None,
                         help="skip videos of this signer (e.g. the held-out test signer)")
+    parser.add_argument("--labels-csv", type=str, default="train_labels.csv",
+                        help="label file under --autsl-dir (train_labels.csv / validation_labels.csv / test_labels.csv)")
     args = parser.parse_args()
 
     with open(args.autsl_dir / "SignList_ClassId_TR_EN.csv", encoding="utf-8-sig") as f:
         class_names = {int(r["ClassId"]): r["TR"] for r in csv.DictReader(f)}
-    with open(args.autsl_dir / "train_labels.csv", encoding="utf-8-sig") as f:
+    with open(args.autsl_dir / args.labels_csv, encoding="utf-8-sig") as f:
         sample_class = {row[0]: int(row[1]) for row in csv.reader(f) if len(row) == 2}
 
     videos = sorted(args.shard_dir.rglob("*_color.mp4"))
