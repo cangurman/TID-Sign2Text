@@ -41,8 +41,7 @@ def main() -> None:
     samples, labels = discover_samples(landmarks_dir)
     if labels != predictor.labels:
         print("[warn] label set on disk differs from checkpoint labels - retrain before evaluating!")
-    # Split over ALL samples (incl. _gecis) exactly like train.py: the split uses one
-    # RNG stream across classes, so dropping _gecis first yields a different split.
+    # Split over ALL samples exactly like train.py (per-class split, see dataset.py).
     train_refs, val_refs = stratified_split(samples, val_ratio=0.2, seed=42)  # must match train.py defaults
     val_paths = {s.path for s in val_refs}
     # Synthetic helper classes (e.g. _gecis) train the model but are excluded

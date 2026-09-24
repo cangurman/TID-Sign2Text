@@ -5,6 +5,7 @@ Data layout: data/landmarks/<label>/*.npy, each file (T, 258) raw landmarks.
 from __future__ import annotations
 
 import sys
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,13 +39,15 @@ def discover_samples(data_dir: Path) -> tuple[list[SampleRef], list[str]]:
 def stratified_split(
     samples: list[SampleRef], val_ratio: float = 0.2, seed: int = 42
 ) -> tuple[list[SampleRef], list[SampleRef]]:
-    rng = np.random.default_rng(seed)
-    by_label: dict[int, list[SampleRef]] = {}
+    # Per-class RNG keyed by class NAME: a class's split must not depend on which
+    # other classes exist (a shared RNG stream shifted the split whenever _gecis
+    # was present/absent, leaking val clips into the transition class).
+    by_label: dict[str, list[SampleRef]] = {}
     for s in samples:
-        by_label.setdefault(s.label_idx, []).append(s)
+        by_label.setdefault(s.path.parent.name, []).append(s)
     train, val = [], []
-    for group in by_label.values():
-        idx = rng.permutation(len(group))
+    for name, group in by_label.items():
+        idx = np.random.default_rng([seed, zlib.crc32(name.encode("utf-8"))]).permutation(len(group))
         n_val = max(1, int(round(len(group) * val_ratio))) if len(group) > 1 else 0
         val.extend(group[i] for i in idx[:n_val])
         train.extend(group[i] for i in idx[n_val:])

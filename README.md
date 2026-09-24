@@ -98,11 +98,13 @@ Araştırma ve mimari gerekçeler: `docs/RESEARCH.md`.
       | Eğitim işaretçisi | Karışık val | signer35 (görülmemiş) | Top-3 |
       |---|---|---|---|
       | 6 (signer0,1,11,16,18,25) | %93.9 | %78.2 (147/188) | %89.9 |
-      | **12 (+6,14,27,30,34,39) — aktif** | **%96.6** | **%89.4 (168/188)** | **%97.9** |
+      | 12 (+6,14,27,30,34,39), eski sızıntılı split | %96.6 | %89.4 (168/188) | %97.9 |
+      | **12, sızıntısı giderilmiş split — aktif** | **%95.3** | **%87.2 (164/188)** | **%96.8** |
       Aynı held-out işaretçi ve aynı ölçüm betiği: 6→12 işaretçi signer35 doğruluğunu
-      +11.2 puan artırdı, hatalar 41→20, tamamen kaçırılan sınıf 9→3 (`dakika`→`saat`,
-      `isik`→`ezberlemek`, `odun`). Önceki modelde `_gecis` gerçek kelimeleri yuttu
-      (5 hata), şimdi 0. Yedek: `best_6signers.pt`.
+      +9.0 puan artırdı (%78.2→%87.2), hatalar 41→24, tamamen kaçırılan sınıf 9→3
+      (`carsamba`, `dakika`→`saat`, `odun`). `_gecis` gerçek kelime yutması 5→2 hata
+      (`pamuk`, `saat`); sıfırlanmadı. Yedekler: `best_6signers.pt`,
+      `best_12signers_oldsplit.pt`. Not: 6 işaretçili satır da eski bölmeyle eğitildi.
       Bu koşuda sınıf listesi en sık örneklenen 64 sınıftır (7 işaretçide ortak 198
       sınıftan); önceki 64 sınıfla birebir aynı olduğu doğrulanamadı.
 - [ ] Özellik vektörüne yüz (dudak+kaş) eklenmesi — TİD'de olumsuzluk/soru
@@ -126,15 +128,19 @@ MediaPipe Holistic video modunda takip durumu videolar arasında sızar: aynı
    train shard'larından işaretçi indirilmeli.
 3. Eğitim doğruluğu %100 = model bu ölçekte ezberliyor; genelleme iddiası yalnızca
    görülmemiş-işaretçi sütunundan okunmalı.
-4. **Bilinen veri sızıntısı (`_gecis`)**: `make_transitions.py` "yalnız train
-   klipleri" der, ama split'i `_gecis` olmadan hesaplar; `train.py` ise dahil
-   ederek. Tek RNG akışı yüzünden iki bölme farklı çıkar, dolayısıyla `_gecis`
-   klipleri val örneklerinin yarım parçalarını içerebilir. Bu, karışık val'ı (%96.6)
-   biraz şişirebilir; signer35 etkilenmez (üretimden önce ayrıldı). Ölçülmedi,
-   düzeltilmedi (düzeltme + yeniden eğitim gerekir).
+4. **`_gecis` veri sızıntısı (düzeltildi, 24 Eyl)**: `stratified_split` tek RNG akışı
+   kullanıyordu; `_gecis` varken/yokken bölme kayıyor, `make_transitions.py`'nin
+   "yalnız train klipleri" varsayımı tutmuyordu (ölçüldü: gerçek sınıf val'ı iki
+   görünümde ortak değildi). Şimdi her sınıf kendi adından türeyen tohumla bölünüyor
+   (`dataset.py`); gerçek sınıfların bölmesi `_gecis`'ten bağımsız (467 val örneği
+   iki görünümde birebir aynı, ölçüldü). `_gecis` yeniden üretildi, model yeniden
+   eğitildi: karışık val %96.6 → %95.3. Signer35 %89.4 → %87.2 ise sızıntıdan
+   kaynaklanmış olamaz (signer35 hiçbir aşamada eğitimde/`_gecis`te yoktu); tek
+   eğitim koşusu olduğundan bu fark eğitim rastgeleliği ile ayırt edilemedi.
 5. **`evaluate_videos.py` split hatası (düzeltildi)**: split'i `_gecis`'i çıkardıktan
    sonra hesaplıyordu; ölçüm: "val" denen 467 örnekten 373'ü aslında eğitimdeydi.
-   Artık `train.py` ile aynı split kullanılıyor (val %96.6, n=467, 16 hata).
+   Artık `train.py` ile aynı split kullanılıyor (val %94.9, n=467, `_gecis` hariç;
+   tablodaki %95.3 `train.py`'nin 507 örnekli, `_gecis` dahil val'ıdır).
 6. `signer1` örnek sayısı diğerlerinin ~2 katı (384; AUTSL val etiketlerinde iki kez
    kayıtlı görünüyor); dengelenmedi, etkisi ayrıca ölçülmedi.
 7. `idle` (işaret yok) sınıfı yok: AUTSL'de bu veri bulunmuyor, webcam kaydı gerekir.
